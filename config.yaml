@@ -1,0 +1,12 @@
+# Model names per agent (Gemini 2.5). See https://ai.google.dev/gemini-api/docs/models
+models:
+  taxonomy: gemini-2.5-pro
+  segment_specialist: gemini-2.5-flash
+  behavioral_ethologist: gemini-2.5-flash
+  competitive_strategist: gemini-2.5-pro
+  decision_jury: gemini-2.5-pro
+
+# Optional limits for demo (0 = no limit)
+limits:
+  max_categories: 0
+  max_segments_per_category: 0

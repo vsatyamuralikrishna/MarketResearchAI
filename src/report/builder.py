@@ -65,12 +65,19 @@ def build_pdf(artifact: dict[str, Any]) -> bytes:
         bottomMargin=1 * inch,
     )
     styles = getSampleStyleSheet()
+    # Brick Red, Blue & White palette
+    BRICK_RED = colors.HexColor("#B22222")
+    NAVY_BLUE = colors.HexColor("#1E3A5F")
+    LIGHT_BLUE_BG = colors.HexColor("#F0F4F8")
+    WHITE = colors.white
+
     title_style = ParagraphStyle(
         name="ReportTitle",
         parent=styles["Heading1"],
         fontSize=20,
         spaceAfter=6,
         spaceBefore=0,
+        textColor=NAVY_BLUE,
     )
     h2_style = ParagraphStyle(
         name="SectionHeading",
@@ -78,7 +85,7 @@ def build_pdf(artifact: dict[str, Any]) -> bytes:
         fontSize=14,
         spaceBefore=14,
         spaceAfter=8,
-        textColor=colors.HexColor("#1a1a1a"),
+        textColor=BRICK_RED,
     )
     h3_style = ParagraphStyle(
         name="SubHeading",
@@ -86,7 +93,7 @@ def build_pdf(artifact: dict[str, Any]) -> bytes:
         fontSize=11,
         spaceBefore=10,
         spaceAfter=4,
-        textColor=colors.HexColor("#333333"),
+        textColor=NAVY_BLUE,
     )
     body = ParagraphStyle(
         name="Body",
@@ -112,7 +119,7 @@ def build_pdf(artifact: dict[str, Any]) -> bytes:
         spaceAfter=0,
         spaceBefore=0,
         fontName="Helvetica-Bold",
-        textColor=colors.whitesmoke,
+        textColor=WHITE,
     )
 
     story = []
@@ -198,15 +205,15 @@ def build_pdf(artifact: dict[str, Any]) -> bytes:
             ])
         t = Table(table_data, colWidths=col_w)
         t.setStyle(TableStyle([
-            ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#2c3e50")),
+            ("BACKGROUND", (0, 0), (-1, 0), NAVY_BLUE),
             ("VALIGN", (0, 0), (-1, -1), "TOP"),
             ("TOPPADDING", (0, 0), (-1, -1), 8),
             ("BOTTOMPADDING", (0, 0), (-1, -1), 8),
             ("LEFTPADDING", (0, 0), (-1, -1), 8),
             ("RIGHTPADDING", (0, 0), (-1, -1), 8),
-            ("BACKGROUND", (0, 1), (-1, -1), colors.HexColor("#f8f9fa")),
-            ("GRID", (0, 0), (-1, -1), 0.5, colors.HexColor("#dee2e6")),
-            ("ROWBACKGROUNDS", (0, 1), (-1, -1), [colors.white, colors.HexColor("#f8f9fa")]),
+            ("BACKGROUND", (0, 1), (-1, -1), LIGHT_BLUE_BG),
+            ("GRID", (0, 0), (-1, -1), 0.5, colors.HexColor("#CBD5E1")),
+            ("ROWBACKGROUNDS", (0, 1), (-1, -1), [WHITE, LIGHT_BLUE_BG]),
         ]))
         story.append(t)
     else:
@@ -300,9 +307,15 @@ def build_html(artifact: dict[str, Any]) -> str:
 
     html_parts = [
         "<!DOCTYPE html><html><head><meta charset='utf-8'><title>Report: " + esc(industry) + "</title>",
-        "<style>body{font-family:system-ui,sans-serif;max-width:800px;margin:2em auto;padding:0 1em;}",
-        "h1{font-size:1.5rem;} h2{font-size:1.2rem;margin-top:1.5em;} h3{font-size:1rem;margin-top:1em;}",
-        "table{border-collapse:collapse;width:100%;margin:0.5em 0;} th,td{border:1px solid #ccc;padding:6px;text-align:left;} th{background:#eee;}",
+        "<style>",
+        "body{font-family:system-ui,sans-serif;max-width:800px;margin:2em auto;padding:0 1em;color:#1E3A5F;}",
+        "h1{font-size:1.5rem;color:#1E3A5F;border-bottom:3px solid #B22222;padding-bottom:0.3em;}",
+        "h2{font-size:1.2rem;margin-top:1.5em;color:#B22222;}",
+        "h3{font-size:1rem;margin-top:1em;color:#1E3A5F;}",
+        "table{border-collapse:collapse;width:100%;margin:0.5em 0;}",
+        "th,td{border:1px solid #CBD5E1;padding:8px;text-align:left;}",
+        "th{background:#1E3A5F;color:white;}",
+        "tr:nth-child(even){background:#F0F4F8;}",
         "</style></head><body>",
         f"<h1>Market Research Report: {esc(industry)}</h1>",
         f"<p>Generated: {datetime.now().strftime('%Y-%m-%d %H:%M')}</p>",

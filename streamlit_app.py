@@ -31,6 +31,103 @@ def _jury_str(jury: dict, key: str) -> str:
 
 st.set_page_config(page_title="Market Research AI", page_icon="📊", layout="wide")
 
+# Brick Red, Blue & White theme — custom CSS
+st.markdown("""
+<style>
+    /* Main title */
+    h1 {
+        color: #1E3A5F !important;
+        font-weight: 700 !important;
+        border-bottom: 3px solid #B22222;
+        padding-bottom: 0.3em;
+    }
+    /* Subtitle / body text */
+    p, .stMarkdown {
+        color: #1E3A5F !important;
+    }
+    /* Run Research button — single blue, white text, simple hover (shadow only) */
+    .stButton > button,
+    [data-testid="stButton"] button,
+    section.main .stButton button,
+    .stButton > button kbd,
+    .stButton > button span {
+        background-color: #1E3A5F !important;
+        color: #FFFFFF !important;
+        -webkit-text-fill-color: #FFFFFF !important;
+        font-weight: 600 !important;
+        border: none !important;
+        border-radius: 8px !important;
+        padding: 0.5rem 1.5rem !important;
+        transition: box-shadow 0.2s ease;
+    }
+    .stButton > button:hover,
+    [data-testid="stButton"] button:hover {
+        background-color: #1E3A5F !important;
+        color: #FFFFFF !important;
+        -webkit-text-fill-color: #FFFFFF !important;
+        box-shadow: 0 3px 10px rgba(30, 58, 95, 0.5);
+    }
+    /* Expander */
+    .streamlit-expanderHeader {
+        background: #F0F4F8 !important;
+        color: #1E3A5F !important;
+        border-left: 4px solid #B22222 !important;
+    }
+    /* Success message */
+    .stSuccess {
+        background: linear-gradient(90deg, #E8F0FE 0%, #F0F4F8 100%) !important;
+        border-left: 4px solid #2563EB !important;
+        color: #1E3A5F !important;
+    }
+    /* Report tabs — Brick red background, white text */
+    .stTabs [data-baseweb="tab-list"] {
+        gap: 8px;
+    }
+    .stTabs [data-baseweb="tab"] {
+        background: #B22222 !important;
+        color: #FFFFFF !important;
+        -webkit-text-fill-color: #FFFFFF !important;
+        border-radius: 8px 8px 0 0;
+        border: 1px solid #8B0000;
+    }
+    .stTabs [data-baseweb="tab"] *,
+    .stTabs [data-baseweb="tab"] span {
+        color: #FFFFFF !important;
+        -webkit-text-fill-color: #FFFFFF !important;
+    }
+    .stTabs [aria-selected="true"] {
+        background: #8B0000 !important;
+        color: #FFFFFF !important;
+        -webkit-text-fill-color: #FFFFFF !important;
+    }
+    .stTabs [aria-selected="true"] *,
+    .stTabs [aria-selected="true"] span {
+        color: #FFFFFF !important;
+        -webkit-text-fill-color: #FFFFFF !important;
+    }
+    /* Progress bar */
+    .stProgress > div > div > div {
+        background: linear-gradient(90deg, #B22222, #2563EB) !important;
+    }
+    /* Input field focus */
+    .stTextInput input:focus {
+        box-shadow: 0 0 0 2px #B22222 !important;
+        border-color: #B22222 !important;
+    }
+    /* Download buttons */
+    a[download] {
+        background: #2563EB !important;
+        color: white !important;
+        padding: 0.5rem 1rem !important;
+        border-radius: 8px !important;
+    }
+    /* Pipeline progress box */
+    div[data-testid="stMarkdownContainer"] p {
+        color: #1E3A5F !important;
+    }
+</style>
+""", unsafe_allow_html=True)
+
 st.title("Market Research AI")
 st.markdown("Multi-agent pipeline: Taxonomy → Segments → Pain Points → Competition → Decision Jury.")
 
@@ -48,6 +145,16 @@ with st.expander("Options (limits for faster demo)"):
     max_seg = None if max_segments == 0 else max_segments
 
 run_clicked = st.button("Run Research")
+
+# Reinject button style after button so it wins over Streamlit theme
+st.markdown("""
+<style>
+.stButton > button { color: #FFFFFF !important; -webkit-text-fill-color: #FFFFFF !important; }
+.stButton > button * { color: #FFFFFF !important; -webkit-text-fill-color: #FFFFFF !important; }
+.stButton > button:hover { color: #FFFFFF !important; -webkit-text-fill-color: #FFFFFF !important; }
+.stButton > button:hover * { color: #FFFFFF !important; -webkit-text-fill-color: #FFFFFF !important; }
+</style>
+""", unsafe_allow_html=True)
 
 if run_clicked and not industry.strip():
     st.warning("Please enter an industry or area.")

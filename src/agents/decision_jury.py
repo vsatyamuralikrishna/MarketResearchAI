@@ -27,16 +27,18 @@ ARTIFACT (JSON):
 
 Jury questions — answer each in 1–3 paragraphs and provide segment-level verdicts:
 
-1. The Conflict Check: Does the Financial Analyst's CAGR (Section 1) match the User Ethologist's reported friction (Section 3)? If the market is growing strongly but users hate existing tools, that's a "Green Flag" for a new entrant. Point out any alignment or mismatch.
+1. Conflict Check: Does growth (Section 1 / Stage 1) match user friction (Section 3)? Growing market + user pain = green flag for new entrant. Note alignment or mismatch.
 
-2. The Moat Assessment: Given the Competition (Section 4), can a new solution actually survive? Is the "Delivery Mechanism" too expensive to acquire users? Summarize barriers and opportunities.
+2. Moat Assessment: Given competition (Section 4), can a new solution survive? Summarize barriers and opportunities.
 
-3. Resource Allocation: If you had $1M to spend, which specific segment offers the shortest "Time to Revenue"? Name category and segment and justify briefly.
+3. Resource Allocation: If you had $1M, which segment offers shortest time to revenue? Name category and segment and justify.
 
-4. Segment Verdicts: For each segment mentioned in the artifact, assign a verdict: "green" (strong opportunity), "amber" (moderate), or "red" (avoid / saturated). Include a short rationale per segment.
+4. Segment Verdicts: For each segment, assign verdict: "green" (strong opportunity), "amber" (moderate), "red" (avoid). Short rationale per segment.
+
+5. Synthesis (Stage 6): If mode is "exploratory", set synthesis_type to "landscape" and provide opportunity_heat_map_summary (where to play), strategic_recommendations (2–5 bullets), next_steps. If mode is "problem_driven", set synthesis_type to "strategy" and provide strategic_recommendations (RICE-style action items) and next_steps.
 
 Output format (strict JSON only, no markdown, no code fences):
-Single JSON object with keys: conflict_check, moat_assessment, resource_allocation, executive_summary, segment_verdicts.
+Single JSON object with keys: conflict_check, moat_assessment, resource_allocation, executive_summary, segment_verdicts, synthesis_type, opportunity_heat_map_summary, strategic_recommendations (array of strings), next_steps (array of strings).
 Use \\n for line breaks inside strings. Escape any double-quote inside a string with backslash. No trailing commas.
 """
 
@@ -99,10 +101,16 @@ def run(artifact: dict[str, Any], model_name: str | None = None) -> JuryOutput:
                 )
             )
 
+    recs = data.get("strategic_recommendations")
+    steps = data.get("next_steps")
     return JuryOutput(
         conflict_check=_to_str(data.get("conflict_check")),
         moat_assessment=_to_str(data.get("moat_assessment")),
         resource_allocation=_to_str(data.get("resource_allocation")),
         segment_verdicts=verdicts,
         executive_summary=_to_str(data.get("executive_summary")),
+        synthesis_type=_to_str(data.get("synthesis_type")),
+        opportunity_heat_map_summary=_to_str(data.get("opportunity_heat_map_summary")),
+        strategic_recommendations=list(recs) if isinstance(recs, list) else [],
+        next_steps=list(steps) if isinstance(steps, list) else [],
     )

@@ -19,6 +19,10 @@ DEFAULT_MODELS = {
     "behavioral_ethologist": "gemini-2.5-flash",
     "competitive_strategist": "gemini-2.5-pro",
     "decision_jury": "gemini-2.5-pro",
+    "industry_scoper": "gemini-2.5-pro",
+    "problem_scoper": "gemini-2.5-flash",
+    "market_sizing": "gemini-2.5-flash",
+    "positioning": "gemini-2.5-pro",
 }
 
 # Retry config

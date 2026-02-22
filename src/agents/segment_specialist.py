@@ -7,7 +7,7 @@ from __future__ import annotations
 
 from src.config import get_model
 from src.gemini_client import generate_json
-from src.models import CategorySegments, Segment
+from src.models import CategorySegments, Segment, SegmentPlayer
 
 
 SYSTEM = (
@@ -25,8 +25,9 @@ Category context: {category_context}
 
 Research questions:
 1. For this category, what are the Primary vs. Secondary Segments? (List 2–5 segments; label each as "primary" or "secondary".)
-2. What are the Growth Drivers (e.g., regulatory shifts, tech breakthroughs) for each segment?
-3. Which segments are currently Under-capitalized vs. Over-saturated?
+2. What are the Growth Drivers for each segment?
+3. Which segments are Under-capitalized vs. Over-saturated?
+4. (Segment deep-dive) For each segment: top 3–5 players with estimated market share, business model; typical pricing range; dominant technology/delivery; regulatory requirements; funding landscape (VC invested, recent rounds); market concentration note (HHI or qualitative).
 
 Output format (strict JSON, no markdown):
 {{
@@ -39,7 +40,13 @@ Output format (strict JSON, no markdown):
       "growth_drivers": ["<driver1>", "<driver2>"],
       "under_capitalized": true or false,
       "over_saturated": true or false,
-      "notes": "<optional notes>"
+      "notes": "<optional notes>",
+      "top_players": [{{"name": "<player>", "market_share": "<e.g. 25%>", "business_model": "<e.g. SaaS>"}}],
+      "pricing_range": "<e.g. $10-50/mo>",
+      "technology_stack": "<dominant tech/delivery>",
+      "regulatory_requirements": "<brief>",
+      "funding_landscape": "<total VC, recent rounds>",
+      "hhi_note": "<concentration: fragmented/moderate/concentrated>"
     }}
   ]
 }}

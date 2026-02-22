@@ -133,19 +133,50 @@ def build_pdf(artifact: dict[str, Any]) -> bytes:
     story.append(Paragraph(f"Generated: {datetime.now().strftime('%Y-%m-%d %H:%M')}", body))
     story.append(Spacer(1, 0.35 * inch))
 
-    # Methodology (split into two paragraphs for readability)
+    # Methodology
     story.append(Paragraph("Methodology", h2_style))
+    mode = artifact.get("mode") or "exploratory"
+    mode_label = "Exploratory (industry landscape)" if mode == "exploratory" else "Problem-Driven (idea validation)"
     story.append(Paragraph(
-        "This report was produced by a sequential multi-agent pipeline: "
-        "(1) Taxonomy Architect — industry decomposition and TAM/SOM/CAGR; "
-        "(2) Segment Specialist — primary/secondary segments per category; "
-        "(3) Behavioral Ethologist — user pain points and friction; "
-        "(4) Competitive Strategist — delivery mechanisms and gaps; "
-        "(5) Decision Jury — conflict check, moat assessment, and resource allocation.",
+        f"This report was produced by the Unified Dual-Mode pipeline ({mode_label}): "
+        "Stage 0E/0P Scoping → Stage 1 Market Sizing → Taxonomy/Segments → Pain Points → Competition → "
+        "Positioning (problem-driven) → Stage 6 Synthesis / Decision Jury.",
         body,
     ))
     story.append(Paragraph("Data reflects agent-generated analysis based on the stated industry.", body))
     story.append(Spacer(1, 0.3 * inch))
+
+    # Scoping (Stage 0E or 0P) — optional
+    stage0e = artifact.get("stage0e") or {}
+    stage0p = artifact.get("stage0p") or {}
+    if stage0e and stage0e.get("industry_boundaries"):
+        story.append(Paragraph("Industry Scoping (Stage 0E)", h2_style))
+        story.append(Paragraph(_esc(stage0e.get("industry_boundaries") or ""), body))
+        story.append(Paragraph("<b>Value chain:</b> " + _esc(stage0e.get("value_chain_summary") or ""), body))
+        story.append(Spacer(1, 0.2 * inch))
+    if stage0p and stage0p.get("problem_statement"):
+        story.append(Paragraph("Problem Scoping (Stage 0P)", h2_style))
+        story.append(Paragraph(_esc(stage0p.get("problem_statement") or ""), body))
+        story.append(Paragraph("Target user: " + _esc(stage0p.get("target_user") or ""), body))
+        story.append(Paragraph("Target segment: " + _esc(stage0p.get("target_segment") or ""), body))
+        story.append(Spacer(1, 0.2 * inch))
+
+    # Stage 1 Market Sizing — optional
+    stage1 = artifact.get("stage1") or {}
+    if stage1.get("category_sizing_matrix") or stage1.get("tam_sam_som"):
+        story.append(Paragraph("Market Sizing (Stage 1)", h2_style))
+        if stage1.get("tam_sam_som"):
+            tss = stage1["tam_sam_som"]
+            story.append(Paragraph("TAM: " + _esc(tss.get("tam") or ""), body))
+            story.append(Paragraph("SAM: " + _esc(tss.get("sam") or ""), body))
+            story.append(Paragraph("SOM: " + _esc(tss.get("som") or ""), body))
+        for row in stage1.get("category_sizing_matrix") or []:
+            story.append(Paragraph(
+                f"{_esc(row.get('category_name'))}: {_esc(row.get('market_size'))} | CAGR {_esc(row.get('cagr'))}",
+                body,
+            ))
+        story.append(Paragraph(_esc(stage1.get("summary") or ""), body))
+        story.append(Spacer(1, 0.2 * inch))
 
     # Executive Summary — data-rich: industry, category count, key metrics, jury summary
     story.append(Paragraph("Executive Summary", h2_style))
@@ -288,6 +319,27 @@ def build_pdf(artifact: dict[str, Any]) -> bytes:
             continue
         line = f"{_esc(_to_str_val(v.get('category_name')))} / {_esc(_to_str_val(v.get('segment_name')))}: <b>{_esc(_to_str_val(v.get('verdict')))}</b> — {_esc(_to_str_val(v.get('rationale')))}"
         story.append(Paragraph(line, body))
+    opp_heat = jury.get("opportunity_heat_map_summary")
+    if opp_heat:
+        story.append(Paragraph("Opportunity Heat Map", h3_style))
+        story.append(Paragraph(_esc(opp_heat), body))
+    for rec in jury.get("strategic_recommendations") or []:
+        story.append(Paragraph("• " + _esc(rec), body))
+    next_steps = jury.get("next_steps") or []
+    if next_steps:
+        story.append(Paragraph("Next Steps", h3_style))
+        for step in next_steps:
+            story.append(Paragraph("• " + _esc(step), body))
+
+    # Stage 5 Positioning (problem-driven)
+    stage5 = artifact.get("stage5") or {}
+    if artifact.get("mode") == "problem_driven" and stage5:
+        story.append(Spacer(1, 0.3 * inch))
+        story.append(Paragraph("Positioning &amp; GTM (Stage 5)", h2_style))
+        story.append(Paragraph("Competitive advantage: " + _esc(stage5.get("unique_competitive_advantage") or ""), body))
+        story.append(Paragraph("Pricing: " + _esc(stage5.get("pricing_strategy") or ""), body))
+        story.append(Paragraph("Funding: " + _esc(stage5.get("funding_required") or ""), body))
+        story.append(Paragraph("GTM: " + _esc(stage5.get("gtm_strategy") or ""), body))
 
     doc.build(story)
     return buf.getvalue()
@@ -320,8 +372,8 @@ def build_html(artifact: dict[str, Any]) -> str:
         f"<h1>Market Research Report: {esc(industry)}</h1>",
         f"<p>Generated: {datetime.now().strftime('%Y-%m-%d %H:%M')}</p>",
         "<h2>Methodology</h2>",
-        "<p>This report was produced by a sequential multi-agent pipeline: Taxonomy Architect, Segment Specialist, "
-        "Behavioral Ethologist, Competitive Strategist, and Decision Jury.</p>",
+        "<p>This report was produced by the Unified Dual-Mode pipeline (Exploratory or Problem-Driven): "
+        "Stage 0E/0P Scoping → Stage 1 Market Sizing → Segments → Pain Points → Competition → Positioning → Synthesis.</p>",
         "<h2>Executive Summary</h2>",
     ]
     # Data-rich executive summary for HTML
@@ -386,7 +438,7 @@ def build_html(artifact: dict[str, Any]) -> str:
         html_parts.append(f"<p>Experience gaps: {esc('; '.join(cg.get('experience_gaps') or []))}</p>")
         html_parts.append(f"<p>Moat: {esc(cg.get('moat_assessment'))}</p>")
 
-    html_parts.append("<h2>Decision Jury</h2>")
+    html_parts.append("<h2>Decision Jury / Synthesis</h2>")
     html_parts.append(f"<h3>Conflict Check</h3><p>{esc(_jury_str(jury, 'conflict_check'))}</p>")
     html_parts.append(f"<h3>Moat Assessment</h3><p>{esc(_jury_str(jury, 'moat_assessment'))}</p>")
     html_parts.append(f"<h3>Resource Allocation ($1M)</h3><p>{esc(_jury_str(jury, 'resource_allocation'))}</p>")
@@ -395,6 +447,27 @@ def build_html(artifact: dict[str, Any]) -> str:
         if not isinstance(v, dict):
             continue
         html_parts.append(f"<li>{esc(_to_str_val(v.get('category_name')))} / {esc(_to_str_val(v.get('segment_name')))}: <strong>{esc(_to_str_val(v.get('verdict')))}</strong> — {esc(_to_str_val(v.get('rationale')))}</li>")
-    html_parts.append("</ul></body></html>")
+    if jury.get("opportunity_heat_map_summary"):
+        html_parts.append(f"<h3>Opportunity Heat Map</h3><p>{esc(_to_str_val(jury.get('opportunity_heat_map_summary')))}</p>")
+    recs = jury.get("strategic_recommendations") or []
+    if recs:
+        html_parts.append("<h3>Strategic Recommendations</h3><ul>")
+        for r in recs:
+            html_parts.append(f"<li>{esc(r)}</li>")
+        html_parts.append("</ul>")
+    steps = jury.get("next_steps") or []
+    if steps:
+        html_parts.append("<h3>Next Steps</h3><ul>")
+        for s in steps:
+            html_parts.append(f"<li>{esc(s)}</li>")
+        html_parts.append("</ul>")
+    stage5 = artifact.get("stage5") or {}
+    if artifact.get("mode") == "problem_driven" and stage5:
+        html_parts.append("<h2>Positioning &amp; GTM (Stage 5)</h2>")
+        html_parts.append(f"<p><strong>Competitive advantage:</strong> {esc(stage5.get('unique_competitive_advantage'))}</p>")
+        html_parts.append(f"<p><strong>Pricing:</strong> {esc(stage5.get('pricing_strategy'))}</p>")
+        html_parts.append(f"<p><strong>Funding:</strong> {esc(stage5.get('funding_required'))}</p>")
+        html_parts.append(f"<p><strong>GTM:</strong> {esc(stage5.get('gtm_strategy'))}</p>")
+    html_parts.append("</body></html>")
 
     return "".join(html_parts)

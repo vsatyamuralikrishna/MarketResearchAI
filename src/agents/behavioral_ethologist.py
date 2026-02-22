@@ -24,18 +24,23 @@ Segment: {segment_name}
 Segment context: {segment_context}
 
 Research questions:
-1. The 'Zero Moment of Truth': When exactly does the user realize their current process is broken? (Describe the trigger moment.)
-2. Alternative Path Analysis: What are the 'free' or 'manual' workarounds users use before paying for a solution?
-3. Retention Killers: Why do they quit existing solutions? (e.g., 'Too complex for my staff,' 'Data silo issues,' 'Hidden costs'.)
+1. Zero Moment of Truth: When does the user realize their process is broken?
+2. Alternative paths: What workarounds do users try before paying?
+3. Retention killers: Why do they quit existing solutions?
+4. (Customer & demand) Persona summary for this segment; jobs-to-be-done (functional + emotional); demand signals (search trends, forum activity); willingness to pay.
 
 Output format (strict JSON, no markdown):
 {{
   "category_name": "<category name>",
   "segment_name": "<segment name>",
-  "zero_moment_of_truth": "<description of when user realizes the problem>",
+  "zero_moment_of_truth": "<description>",
   "alternative_paths": ["<workaround1>", "<workaround2>"],
   "retention_killers": ["<reason1>", "<reason2>"],
-  "notes": "<optional>"
+  "notes": "<optional>",
+  "persona_summary": "<who are end users; primary needs>",
+  "jobs_to_be_done": ["<job1>", "<job2>"],
+  "demand_signals": "<search trends, forum activity, review volume>",
+  "willingness_to_pay": "<evidence or range>"
 }}
 """
 
@@ -65,4 +70,8 @@ def run(
         alternative_paths=list(data.get("alternative_paths") or []),
         retention_killers=list(data.get("retention_killers") or []),
         notes=data.get("notes") or "",
+        persona_summary=data.get("persona_summary") or "",
+        jobs_to_be_done=list(data.get("jobs_to_be_done") or []),
+        demand_signals=data.get("demand_signals") or "",
+        willingness_to_pay=data.get("willingness_to_pay") or "",
     )

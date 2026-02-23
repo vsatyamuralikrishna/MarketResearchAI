@@ -19,6 +19,10 @@ DEFAULT_MODELS = {
     "behavioral_ethologist": "gemini-2.5-flash",
     "competitive_strategist": "gemini-2.5-pro",
     "decision_jury": "gemini-2.5-pro",
+    "industry_scoper": "gemini-2.5-pro",
+    "problem_scoper": "gemini-2.5-flash",
+    "market_sizing": "gemini-2.5-flash",
+    "positioning": "gemini-2.5-pro",
 }
 
 # Retry config
@@ -73,7 +77,7 @@ def generate(
     *,
     system_instruction: str | None = None,
     temperature: float = 0.2,
-    max_output_tokens: int = 8192,
+    max_output_tokens: int = 16384,
 ) -> str:
     """
     Call Gemini with the given prompt and model. Retries on rate limit/transient errors.
@@ -116,14 +120,31 @@ def generate(
 
 
 def extract_json_block(text: str) -> str | None:
-    """Extract a ```json ... ``` block from markdown, or first {...} from text."""
+    """Extract a ```json ... ``` block from markdown, or the largest {...} object from text."""
+    if not (text or text.strip()):
+        return None
+    text = text.strip()
+    # Prefer explicit JSON code block
     match = re.search(r"```(?:json)?\s*([\s\S]*?)```", text, re.IGNORECASE)
     if match:
         return match.group(1).strip()
-    match = re.search(r"\{[\s\S]*\}", text)
-    if match:
-        return match.group(0)
-    return None
+    # Find the largest top-level {...} (balance braces in case of nested JSON)
+    start = text.find("{")
+    if start == -1:
+        return None
+    depth = 0
+    end = -1
+    for i in range(start, len(text)):
+        if text[i] == "{":
+            depth += 1
+        elif text[i] == "}":
+            depth -= 1
+            if depth == 0:
+                end = i
+                break
+    if end != -1:
+        return text[start : end + 1]
+    return text[start:]  # truncated; caller may still try to fix
 
 
 def _try_fix_json(blob: str) -> str:
@@ -138,6 +159,7 @@ def generate_json(
     model_name: str,
     *,
     system_instruction: str | None = None,
+    max_output_tokens: int = 16384,
 ) -> dict[str, Any]:
     """
     Call Gemini and parse response as JSON. Extracts JSON from markdown blocks.
@@ -147,6 +169,7 @@ def generate_json(
         prompt,
         model_name,
         system_instruction=system_instruction,
+        max_output_tokens=max_output_tokens,
     )
     blob = extract_json_block(raw)
     if not blob:

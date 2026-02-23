@@ -73,10 +73,10 @@ def _build_section1_from_exploratory(
             Category(
                 name=tc.name,
                 description=tc.description or "",
-                tam=row.market_size if row else (tc.size_range or ""),
-                som=row.largest_segment_size if row else "",
-                historical_cagr=row.cagr if row else "",
-                projected_cagr=row.segment_cagr if row else "",
+                tam=(row.market_size if row else None) or (tc.size_range or ""),
+                som=(row.largest_segment_size if row else None) or "",
+                historical_cagr=(row.historical_cagr if row else None) or "",
+                projected_cagr=(row.projected_cagr or (row.segment_cagr if row else None) if row else None) or "",
                 trends=[tc.growth_signal] if tc.growth_signal else [],
             )
         )
@@ -95,6 +95,7 @@ def run_pipeline(
     output_path: str | Path | None = None,
     max_categories: int | None = None,
     max_segments_per_category: int | None = None,
+    use_deep_research: bool = False,
     # Exploratory-only
     industry_boundaries_hint: str = "",
     # Problem-driven-only
@@ -113,8 +114,10 @@ def run_pipeline(
     """
     Run the Unified Dual-Mode pipeline. Returns the Research Artifact (dict).
     mode: "exploratory" | "problem_driven"
+    use_deep_research: If True, use Gemini Deep Research Agent for Stage 0E (and future stages) for web-backed insights.
     """
     report = _default_progress if progress is None else progress
+    progress_dr = (lambda msg, p: report(msg, p, None)) if progress else None
     artifact: dict[str, Any] = {
         "mode": mode,
         "industry": industry,
@@ -132,8 +135,13 @@ def run_pipeline(
 
     if mode == RESEARCH_MODE_EXPLORATORY:
         # --- Stage 0E: Industry Scoper ---
-        report("Stage 0E — Industry Scoping…", 0.02, None)
-        stage0e = run_industry_scoper(industry, industry_boundaries_hint=industry_boundaries_hint)
+        report("Stage 0E — Industry Scoping…" + (" (Deep Research, may take several minutes)" if use_deep_research else ""), 0.02, None)
+        stage0e = run_industry_scoper(
+            industry,
+            industry_boundaries_hint=industry_boundaries_hint,
+            use_deep_research=use_deep_research,
+            progress_callback=progress_dr,
+        )
         artifact["stage0e"] = stage0e.model_dump()
         artifact["industry"] = stage0e.industry
         report("Stage 0E — Completed", 0.08, 0)

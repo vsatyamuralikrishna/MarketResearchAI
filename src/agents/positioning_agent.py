@@ -9,13 +9,13 @@ from typing import Any
 
 from src.config import get_model
 from src.gemini_client import generate_json
-from src.models import Stage5Output
+from src.models import SegmentPositioningBrief, Stage5Output, _ensure_str_list
 
 
 SYSTEM = (
     "You are a strategy expert focused on positioning and GTM. You produce a clear unique competitive "
-    "advantage, positioning vs. competitors, pricing strategy, funding need, and break-even view. "
-    "Respond with valid JSON only."
+    "advantage, explicit positioning statement, perceptual map, pricing hypothesis, and one-page problem & "
+    "positioning briefs per recommended segment. Respond with valid JSON only."
 )
 
 PROMPT_TEMPLATE = """
@@ -24,23 +24,36 @@ Produce a Positioning & GTM document for this opportunity (Problem-Driven mode).
 ARTIFACT (summary of research so far):
 {artifact_json}
 
-Based on the problem statement, target segment, competition, and pain points in the artifact:
-1. What is the unique competitive advantage?
-2. Where do we sit on the competitive matrix vs. existing players?
-3. Closest competitor and their GTM — will it work for us? Missing customer segment?
-4. Pricing strategy (competitive pricing + willingness-to-pay alignment).
-5. Funding required and likely investors.
-6. Break-even point (volume/timeline).
+Required outputs:
+
+1. unique_competitive_advantage, positioning_summary, pricing_strategy, funding_required, break_even_summary, gtm_strategy, recommended_investors (as before).
+
+2. positioning_statement: One explicit one-liner (e.g. "For youth with social anxiety, we offer the first deeply condition-specific digital therapeutic integrated with specialized therapists, at $X/month D2C.").
+
+3. perceptual_map_2x2_note: Axes (e.g. "Level of clinical specialization low→high" vs "Digital tooling depth") and where we sit vs incumbents; where a hypothetical wedge sits.
+
+4. price_anchor_per_segment: Rough price anchor for recommended segments (e.g. "$X/month D2C or $Y PMPM employer contracts").
+
+5. segment_briefs: For each recommended segment (e.g. 1–2), a one-page brief:
+   - segment_name, problem_statement (crystallized from landscape, e.g. "For youth with social anxiety, current self-help apps are generic and poorly personalized, leading to X% churn"),
+   - target_user, current_alternatives, why_now,
+   - proposed_offering, unique_edge, price_anchor (e.g. "$X/month D2C or $Y PMPM").
 
 Output format (strict JSON, no markdown):
 {{
   "unique_competitive_advantage": "<paragraph>",
   "positioning_summary": "<where we sit vs. competitors>",
+  "positioning_statement": "<one-liner>",
+  "perceptual_map_2x2_note": "<axes + where we and incumbents sit>",
   "pricing_strategy": "<paragraph>",
+  "price_anchor_per_segment": "<rough anchor for recommended segments>",
   "funding_required": "<amount and use of funds>",
   "break_even_summary": "<volume and timeline>",
   "gtm_strategy": "<go-to-market summary>",
-  "recommended_investors": ["<investor1>", "<investor2>"]
+  "recommended_investors": ["<investor1>", "<investor2>"],
+  "segment_briefs": [
+    {{"segment_name": "<>", "problem_statement": "<>", "target_user": "<>", "current_alternatives": "<>", "why_now": "<>", "proposed_offering": "<>", "unique_edge": "<>", "price_anchor": "<>"}}
+  ]
 }}
 """
 
@@ -65,7 +78,8 @@ def _artifact_summary(artifact: dict[str, Any]) -> str:
         parts.append(f"Segments in {cs.get('category_name')}: {', '.join(s.get('name') or '' for s in (cs.get('segments') or []))}")
     section4 = artifact.get("section4") or []
     for cg in section4[:5]:
-        parts.append(f"Competition {cg.get('category_name')}/{cg.get('segment_name')}: moat={cg.get('moat_assessment', '')[:200]}")
+        moat = cg.get("moat_assessment")
+        parts.append(f"Competition {cg.get('category_name')}/{cg.get('segment_name')}: moat={str(moat or '')[:200]}")
     return "\n".join(parts)
 
 
@@ -79,18 +93,33 @@ def run(artifact: dict[str, Any], model_name: str | None = None) -> Stage5Output
     prompt = PROMPT_TEMPLATE.format(artifact_json=summary)
     data = generate_json(prompt, model, system_instruction=SYSTEM)
 
-    rec_inv = data.get("recommended_investors")
-    if isinstance(rec_inv, list):
-        investors = [str(x) for x in rec_inv]
-    else:
-        investors = []
+    investors = _ensure_str_list(data.get("recommended_investors"))
 
+    briefs = []
+    for b in data.get("segment_briefs") or []:
+        if isinstance(b, dict):
+            briefs.append(
+                SegmentPositioningBrief(
+                    segment_name=b.get("segment_name") or "",
+                    problem_statement=b.get("problem_statement") or "",
+                    target_user=b.get("target_user") or "",
+                    current_alternatives=b.get("current_alternatives") or "",
+                    why_now=b.get("why_now") or "",
+                    proposed_offering=b.get("proposed_offering") or "",
+                    unique_edge=b.get("unique_edge") or "",
+                    price_anchor=b.get("price_anchor") or "",
+                )
+            )
     return Stage5Output(
         unique_competitive_advantage=data.get("unique_competitive_advantage") or "",
         positioning_summary=data.get("positioning_summary") or "",
+        positioning_statement=data.get("positioning_statement") or "",
+        perceptual_map_2x2_note=data.get("perceptual_map_2x2_note") or "",
         pricing_strategy=data.get("pricing_strategy") or "",
+        price_anchor_per_segment=data.get("price_anchor_per_segment") or "",
         funding_required=data.get("funding_required") or "",
         break_even_summary=data.get("break_even_summary") or "",
         gtm_strategy=data.get("gtm_strategy") or "",
         recommended_investors=investors,
+        segment_briefs=briefs,
     )

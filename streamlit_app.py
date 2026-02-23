@@ -19,7 +19,7 @@ try:
 except Exception:
     pass
 
-from src.models import RESEARCH_MODE_EXPLORATORY, RESEARCH_MODE_PROBLEM_DRIVEN, _coerce_str
+from src.models import RESEARCH_MODE_EXPLORATORY, RESEARCH_MODE_PROBLEM_DRIVEN, _coerce_str, _ensure_str_list
 from src.orchestrator import AGENT_LABELS, run_pipeline
 from src.report.builder import build_html, build_pdf
 
@@ -180,12 +180,28 @@ else:
     )
     hypotheses_list = [h.strip() for h in (hypotheses_text or "").split("\n") if h.strip()]
 
-# Optional limits for demo
+# Optional limits and Deep Research
 with st.expander("Options (limits for faster demo)"):
     max_categories = st.number_input("Max categories (0 = no limit)", min_value=0, value=0, step=1)
     max_segments = st.number_input("Max segments per category (0 = no limit)", min_value=0, value=0, step=1)
     max_cat = None if max_categories == 0 else max_categories
     max_seg = None if max_segments == 0 else max_segments
+    use_deep_research = st.checkbox(
+        "Use Deep Research for Stage 0E only (industry scoping; web-backed, cited; slower)",
+        value=False,
+        key="use_deep_research",
+        help="Only Stage 0E (Industry Scoping) uses Deep Research when enabled. Other stages use standard models. Use this when you need current, cited taxonomy and PESTEL from the web.",
+    )
+
+# Access passcode (if APP_PASSCODE is set in .env, user must enter it to run)
+_required_passcode = (os.environ.get("APP_PASSCODE") or "").strip()
+user_passcode = st.text_input(
+    "Access passcode",
+    type="password",
+    placeholder="Enter passcode to run research" if _required_passcode else "Not required (no passcode set)",
+    key="access_passcode",
+    help="Required when the app is protected. Contact the owner for access.",
+)
 
 run_clicked = st.button("Run Research")
 
@@ -205,6 +221,15 @@ if run_clicked and not industry.strip():
 if run_clicked and mode == RESEARCH_MODE_PROBLEM_DRIVEN and not (problem_statement or "").strip():
     st.warning("Problem-Driven mode requires a problem statement.")
     run_clicked = False
+
+# Passcode check: if APP_PASSCODE is set, require exact match
+if run_clicked and _required_passcode:
+    if (user_passcode or "").strip() != _required_passcode:
+        st.error(
+            "**Access not allowed.** The passcode you entered is incorrect. "
+            "To request access, contact satyamuralikrishna13@gmail.com"
+        )
+        run_clicked = False
 
 if run_clicked and industry.strip():
     progress_placeholder = st.empty()
@@ -235,6 +260,7 @@ if run_clicked and industry.strip():
         output_path=_project_root / "output" / "artifact.json",
         max_categories=max_cat,
         max_segments_per_category=max_seg,
+        use_deep_research=use_deep_research,
     )
     if mode == RESEARCH_MODE_EXPLORATORY:
         kwargs["industry_boundaries_hint"] = (industry_boundaries_hint or "").strip()
@@ -300,14 +326,31 @@ if artifact:
 
     with tabs[1]:
         if art_mode == RESEARCH_MODE_EXPLORATORY and stage0e:
-            st.markdown("**Stage 0E: Industry Taxonomy**")
+            st.markdown("**Stage 0E: Industry Taxonomy Map**")
+            level1 = stage0e.get("level1_industry_name") or stage0e.get("industry")
+            st.markdown(f"**Level 1 (Industry):** {level1}")
+            st.markdown("**Industry boundaries:**")
             st.markdown(stage0e.get("industry_boundaries") or "—")
             st.markdown("**Value chain:** " + (stage0e.get("value_chain_summary") or "—"))
+            if stage0e.get("industry_classification"):
+                st.markdown("**Industry classification (NAICS / analysts):** " + stage0e.get("industry_classification"))
+            if stage0e.get("pestel_overview"):
+                st.markdown("**PESTEL overview:**")
+                st.markdown(stage0e.get("pestel_overview"))
+            st.markdown("**4-level taxonomy**")
             for cat in stage0e.get("categories") or []:
-                st.markdown(f"- **{cat.get('name')}** ({cat.get('size_range')}, {cat.get('growth_signal')})")
+                st.markdown(f"- **L2 {cat.get('name')}** ({cat.get('size_range')}, {cat.get('growth_signal')})")
                 for sc in cat.get("subcategories") or []:
                     for seg in sc.get("segments") or []:
-                        st.caption(f"  → {sc.get('name')} / {seg.get('name')}")
+                        st.caption(f"  → L3 {sc.get('name')} / L4 {seg.get('name')}")
+            tq = stage0e.get("taxonomy_quantification") or {}
+            if tq:
+                st.markdown("**Quantification:**")
+                st.markdown(f"Categories identified: **{tq.get('categories_count', '—')}**; Segments mapped: **{tq.get('segments_count', '—')}**")
+                if tq.get("size_orders_summary"):
+                    st.markdown("Size orders: " + tq.get("size_orders_summary"))
+                if tq.get("growth_signals_summary"):
+                    st.markdown("Growth signals: " + tq.get("growth_signals_summary"))
         elif stage0p:
             st.markdown("**Stage 0P: Problem Statement Brief**")
             st.markdown(stage0p.get("problem_statement") or "—")
@@ -323,9 +366,18 @@ if artifact:
 
     with tabs[2]:
         st.markdown("**Stage 1: Market Sizing**")
+        if stage1.get("mode_clarification"):
+            st.caption(stage1.get("mode_clarification"))
         if stage1.get("category_sizing_matrix"):
+            st.markdown("**Category × Segment matrix**")
             for row in stage1.get("category_sizing_matrix") or []:
-                st.markdown(f"- **{row.get('category_name')}**: {row.get('market_size')} | CAGR {row.get('cagr')} | Largest: {row.get('largest_segment_name')} ({row.get('largest_segment_size')})")
+                st.markdown(f"- **{row.get('category_name')}**: TAM {row.get('market_size')} | Hist. CAGR {row.get('historical_cagr')} | Proj. CAGR {row.get('projected_cagr')} | Largest: {row.get('largest_segment_name')} ({row.get('largest_segment_size')}, {row.get('segment_cagr')}) | {row.get('growth_signal')}")
+                if row.get("key_segments"):
+                    st.caption("Key segments: " + ", ".join(row.get("key_segments") or []))
+                for d in row.get("growth_drivers") or []:
+                    st.caption("  ↑ " + d)
+                for h in row.get("headwinds") or []:
+                    st.caption("  ↓ " + h)
         if stage1.get("tam_sam_som"):
             tss = stage1["tam_sam_som"]
             st.markdown("**TAM:** " + (tss.get("tam") or "—"))
@@ -343,10 +395,15 @@ if artifact:
         for cs in section2:
             st.markdown(f"**{cs.get('category_name')}**")
             for seg in cs.get("segments") or []:
-                st.markdown(f"- {seg.get('name')} ({seg.get('segment_type')}): {seg.get('description')}")
+                st.markdown(f"- **{seg.get('name')}** ({seg.get('segment_type')}): {seg.get('description')}")
                 st.caption("Drivers: " + "; ".join(seg.get("growth_drivers") or []))
+                if seg.get("num_players_estimate") or seg.get("concentration_band"):
+                    st.caption(f"Players (est.): {seg.get('num_players_estimate') or '—'} | Concentration: {seg.get('concentration_band') or seg.get('hhi_note') or '—'}")
                 if seg.get("top_players"):
-                    st.caption("Players: " + ", ".join(f"{p.get('name')} ({p.get('market_share')})" for p in seg.get("top_players") or []))
+                    for p in seg.get("top_players") or []:
+                        st.caption(f"  • {p.get('name')}: {p.get('market_share')} {p.get('market_share_band') or ''} | {p.get('business_model') or ''} | {p.get('pricing_note') or ''}")
+                if seg.get("segment_deep_dive_summary"):
+                    st.caption("Matrix row: " + seg.get("segment_deep_dive_summary"))
 
     with tabs[4]:
         st.markdown("**User Pain Points & Demand**")
@@ -356,11 +413,17 @@ if artifact:
             st.markdown(f"- Alternatives: {'; '.join(pp.get('alternative_paths') or [])}")
             st.markdown(f"- Retention killers: {'; '.join(pp.get('retention_killers') or [])}")
             if pp.get("persona_summary"):
-                st.markdown("**Persona:** " + pp.get("persona_summary"))
+                st.markdown("**Persona summary:** " + pp.get("persona_summary"))
+            for pc in pp.get("persona_cards") or []:
+                st.markdown(f"  **Persona — {pc.get('name')}:** {pc.get('demographics')} | JTBD: {', '.join(pc.get('jobs_to_be_done') or [])} | WTP: {pc.get('willingness_to_pay_range')} | Channels: {pc.get('preferred_channels')}")
             if pp.get("jobs_to_be_done"):
                 st.markdown("**JTBD:** " + "; ".join(pp.get("jobs_to_be_done") or []))
+            if pp.get("demand_signals"):
+                st.markdown("**Demand signals:** " + pp.get("demand_signals"))
             if pp.get("willingness_to_pay"):
                 st.markdown("**WTP:** " + pp.get("willingness_to_pay"))
+            if pp.get("customer_journey_summary"):
+                st.markdown("**Customer journey:** " + pp.get("customer_journey_summary"))
 
     with tabs[5]:
         st.markdown("**Competition, Delivery & Gaps**")
@@ -370,21 +433,48 @@ if artifact:
             st.markdown(f"- Product gaps: {'; '.join(cg.get('product_feature_gaps') or [])}")
             st.markdown(f"- Moat: {cg.get('moat_assessment')}")
             if cg.get("porter_five_forces_summary"):
-                st.markdown("**Porter's Five Forces:** " + cg.get("porter_five_forces_summary"))
+                st.markdown("**Porter's Five Forces (summary):** " + cg.get("porter_five_forces_summary"))
+            if cg.get("porter_five_forces_detail"):
+                st.markdown("**Porter's Five Forces (detail):** " + cg.get("porter_five_forces_detail"))
+            if cg.get("feature_matrix_summary"):
+                st.markdown("**Feature matrix:** " + cg.get("feature_matrix_summary"))
+            if cg.get("positioning_2x2_axes"):
+                st.markdown("**2×2 axes:** " + cg.get("positioning_2x2_axes"))
+            if cg.get("positioning_2x2_note"):
+                st.markdown("**2×2 positioning:** " + cg.get("positioning_2x2_note"))
             for bc in cg.get("battle_cards") or []:
-                st.markdown(f"  **Battle card — {bc.get('competitor_name')}:** {bc.get('value_proposition')}")
+                st.markdown(f"  **Battle card — {bc.get('competitor_name')}:** {bc.get('value_proposition')} | Pricing: {bc.get('pricing') or '—'} | GTM: {bc.get('gtm_summary') or '—'}")
+                if bc.get("key_features"):
+                    st.caption("Features: " + ", ".join(bc.get("key_features") or []))
 
     with tabs[6]:
         if art_mode == RESEARCH_MODE_PROBLEM_DRIVEN and stage5:
             st.markdown("**Stage 5: Positioning & GTM**")
+            st.markdown("**Positioning statement:** " + (stage5.get("positioning_statement") or "—"))
             st.markdown("**Competitive advantage:** " + (stage5.get("unique_competitive_advantage") or "—"))
             st.markdown("**Positioning:** " + (stage5.get("positioning_summary") or "—"))
+            if stage5.get("perceptual_map_2x2_note"):
+                st.markdown("**Perceptual map (2×2):** " + stage5.get("perceptual_map_2x2_note"))
             st.markdown("**Pricing:** " + (stage5.get("pricing_strategy") or "—"))
+            if stage5.get("price_anchor_per_segment"):
+                st.markdown("**Price anchor (per segment):** " + stage5.get("price_anchor_per_segment"))
             st.markdown("**Funding:** " + (stage5.get("funding_required") or "—"))
             st.markdown("**Break-even:** " + (stage5.get("break_even_summary") or "—"))
             st.markdown("**GTM:** " + (stage5.get("gtm_strategy") or "—"))
-            for inv in stage5.get("recommended_investors") or []:
+            for inv in _ensure_str_list(stage5.get("recommended_investors")):
                 st.markdown(f"- {inv}")
+            segment_briefs = stage5.get("segment_briefs")
+            for b in (segment_briefs if isinstance(segment_briefs, list) else []):
+                if not isinstance(b, dict):
+                    continue
+                st.markdown("---")
+                st.markdown(f"**Segment brief — {b.get('segment_name')}**")
+                st.markdown("Problem: " + (b.get("problem_statement") or "—"))
+                st.markdown("Target user: " + (b.get("target_user") or "—"))
+                st.markdown("Alternatives: " + (b.get("current_alternatives") or "—"))
+                st.markdown("Why now: " + (b.get("why_now") or "—"))
+                st.markdown("Offering / edge: " + (b.get("proposed_offering") or "") + " | " + (b.get("unique_edge") or ""))
+                st.markdown("Price anchor: " + (b.get("price_anchor") or "—"))
         else:
             st.info("Positioning (Stage 5) runs only in Problem-Driven mode.")
 
@@ -402,11 +492,37 @@ if artifact:
             st.markdown(f"- {_coerce_str(v.get('category_name'))} / {_coerce_str(v.get('segment_name'))}: **{_coerce_str(v.get('verdict'))}** — {_coerce_str(v.get('rationale'))}")
         if jury.get("opportunity_heat_map_summary"):
             st.markdown("**Opportunity heat map:** " + _jury_str(jury, "opportunity_heat_map_summary"))
-        for rec in jury.get("strategic_recommendations") or []:
+        attr = jury.get("segment_attractiveness_table") or []
+        if attr:
+            st.markdown("**Segment attractiveness table**")
+            rows = []
+            for r in attr:
+                if isinstance(r, dict):
+                    rows.append({k: v for k, v in r.items() if v})
+            if rows:
+                st.dataframe(rows, width="stretch")
+        scen = jury.get("scenario_analysis")
+        if scen and isinstance(scen, dict):
+            st.markdown("**Scenario analysis (top segment)**")
+            st.markdown(f"Segment: {scen.get('segment_name')}")
+            st.markdown("Base case: " + (scen.get("base_case") or "—"))
+            st.markdown("Best case: " + (scen.get("best_case") or "—"))
+            st.markdown("Worst case: " + (scen.get("worst_case") or "—"))
+            st.caption(scen.get("assumptions_note") or "")
+        for rec in _ensure_str_list(jury.get("strategic_recommendations")):
             st.markdown(f"- {rec}")
         st.markdown("**Next steps**")
-        for step in jury.get("next_steps") or []:
+        for step in _ensure_str_list(jury.get("next_steps")):
             st.markdown(f"- {step}")
+        outline = jury.get("slide_outline") or []
+        if outline and isinstance(outline, list):
+            st.markdown("**Slide outline (Stage 7)**")
+            for s in outline:
+                title = s.get("title") if isinstance(s, dict) else ""
+                bullets = _ensure_str_list(s.get("bullets")) if isinstance(s, dict) else []
+                st.markdown(f"**Slide {s.get('slide_number', '')}:** {title}")
+                for b in bullets:
+                    st.caption("• " + str(b))
 
     with tabs[8]:
         pdf_bytes = build_pdf(artifact)

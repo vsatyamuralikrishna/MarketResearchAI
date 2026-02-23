@@ -5,6 +5,8 @@ Problem-Driven: TAM → SAM → SOM funnel with assumptions.
 """
 from __future__ import annotations
 
+from typing import Any
+
 from src.config import get_model
 from src.gemini_client import generate_json
 from src.models import (
@@ -14,6 +16,17 @@ from src.models import (
 )
 
 
+def _ensure_str_list(x: Any) -> list[str]:
+    """Coerce to list of strings; LLM sometimes returns a single string for list fields."""
+    if x is None:
+        return []
+    if isinstance(x, list):
+        return [str(i) for i in x]
+    if isinstance(x, str):
+        return [x] if x.strip() else []
+    return []
+
+
 SYSTEM = (
     "You are a market sizing expert. You produce either (a) a category-level sizing matrix with "
     "CAGR for exploratory research, or (b) a TAM-SAM-SOM funnel with assumptions for problem-driven "
@@ -21,7 +34,7 @@ SYSTEM = (
 )
 
 PROMPT_EXPLORATORY = """
-Produce a Market Sizing matrix for this industry (Exploratory mode).
+Produce a Market Sizing matrix for this industry (Exploratory mode). Fill every column; no blank CAGRs or sizes.
 
 Industry: {industry}
 Summary / context: {context}
@@ -29,19 +42,32 @@ Summary / context: {context}
 Categories (and optional segments) to size:
 {categories_text}
 
-For each category produce: market size (e.g. $X.XB), CAGR (e.g. X%), largest segment name, largest segment size, segment CAGR.
-Identify growth drivers and headwinds. Output format (strict JSON, no markdown):
+For each category produce a complete matrix row:
+- category_name, market_size (e.g. $50B), historical_cagr and projected_cagr (e.g. 8%, 12%), largest_segment_name, largest_segment_size, segment_cagr, growth_signal (emerging|growing|mature|declining).
+- key_segments: list of 2–5 segment names in this category.
+- growth_drivers: 3–4 bullets (e.g. "Employer demand for scalable benefits", "Telehealth parity laws").
+- headwinds: 3–4 bullets (e.g. "Reimbursement uncertainty for PDTs", "Therapist supply constraints").
+
+Also output mode_clarification: "Stage 1 Exploratory: we estimate TAM per category and segment; SAM/SOM are not modeled in this mode."
+
+Output format (strict JSON, no markdown):
 {{
   "mode": "exploratory",
-  "summary": "<2–3 sentence summary of market size and growth>",
+  "mode_clarification": "Stage 1 Exploratory: TAM per category/segment; SAM/SOM not modeled.",
+  "summary": "<2–3 sentence summary>",
   "category_sizing_matrix": [
     {{
       "category_name": "<name>",
       "market_size": "<e.g. $50B>",
-      "cagr": "<e.g. 8%>",
+      "historical_cagr": "<e.g. 8%>",
+      "projected_cagr": "<e.g. 12%>",
       "largest_segment_name": "<name>",
       "largest_segment_size": "<e.g. $20B>",
-      "segment_cagr": "<e.g. 12%>"
+      "segment_cagr": "<e.g. 12%>",
+      "growth_signal": "emerging|growing|mature|declining",
+      "key_segments": ["<seg1>", "<seg2>"],
+      "growth_drivers": ["<driver1>", "<driver2>", "<driver3>"],
+      "headwinds": ["<headwind1>", "<headwind2>"]
     }}
   ]
 }}
@@ -65,6 +91,7 @@ Include assumptions and growth forecast. Output format (strict JSON, no markdown
 {{
   "mode": "problem_driven",
   "summary": "<2–3 sentence summary>",
+  "mode_clarification": "Stage 1 Problem-Driven: full TAM-SAM-SOM funnel with assumptions.",
   "tam_sam_som": {{
     "tam": "<value and brief rationale>",
     "sam": "<value and brief rationale>",
@@ -117,14 +144,20 @@ def run_exploratory(
                 CategorySizingRow(
                     category_name=row.get("category_name") or "",
                     market_size=row.get("market_size") or "",
-                    cagr=row.get("cagr") or "",
+                    historical_cagr=row.get("historical_cagr") or row.get("cagr") or "",
+                    projected_cagr=row.get("projected_cagr") or "",
                     largest_segment_name=row.get("largest_segment_name") or "",
                     largest_segment_size=row.get("largest_segment_size") or "",
                     segment_cagr=row.get("segment_cagr") or "",
+                    growth_signal=row.get("growth_signal") or "",
+                    key_segments=_ensure_str_list(row.get("key_segments")),
+                    growth_drivers=_ensure_str_list(row.get("growth_drivers")),
+                    headwinds=_ensure_str_list(row.get("headwinds")),
                 )
             )
     return Stage1Output(
         mode="exploratory",
+        mode_clarification=data.get("mode_clarification") or "Stage 1 Exploratory: TAM per category/segment; SAM/SOM not modeled.",
         category_sizing_matrix=matrix,
         tam_sam_som=None,
         summary=data.get("summary") or "",
@@ -165,6 +198,7 @@ def run_problem_driven(
 
     return Stage1Output(
         mode="problem_driven",
+        mode_clarification=data.get("mode_clarification") or "Stage 1 Problem-Driven: full TAM-SAM-SOM funnel.",
         category_sizing_matrix=[],
         tam_sam_som=tam_sam_som,
         summary=data.get("summary") or "",

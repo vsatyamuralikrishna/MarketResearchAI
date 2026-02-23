@@ -1,8 +1,9 @@
 """
-Load config from config.yaml (optional). Falls back to defaults.
+Load config from config.yaml (optional) and env. Falls back to defaults.
 """
 from __future__ import annotations
 
+import os
 from pathlib import Path
 from typing import Any
 
@@ -49,3 +50,14 @@ def get_max_segments_per_category() -> int | None:
     n = cfg.get("limits") or {}
     v = n.get("max_segments_per_category", 0)
     return None if v == 0 else v
+
+
+def get_use_deep_research() -> bool:
+    """Return True if Deep Research agent should be used for data/insights (slower, web-backed)."""
+    env_val = os.environ.get("USE_DEEP_RESEARCH", "").strip().lower()
+    if env_val in ("1", "true", "yes"):
+        return True
+    if env_val in ("0", "false", "no"):
+        return False
+    cfg = _load_config()
+    return bool(cfg.get("use_deep_research", False))

@@ -6,7 +6,7 @@ Multi-agent pipeline for industry market research: **Taxonomy Architect → Segm
 
 - **Python 3.10+**
 - **Streamlit** — UI (input industry, progress, report viewer/download)
-- **Google Gemini API** (`google-genai` SDK) — Agents use Gemini 2.5 (Pro for taxonomy/competitive/jury, Flash for segments/behavioral). See [Gemini API models](https://ai.google.dev/gemini-api/docs/models).
+- **Google Gemini API** (`google-genai` SDK) — Agents use Gemini 2.5 (Pro for taxonomy/competitive/jury, Flash for segments/behavioral). See [Gemini API models](https://ai.google.dev/gemini-api/docs/models). Optional: **Gemini Deep Research Agent** for Stage 0E (Exploratory) for web-backed, cited insights via the [Interactions API](https://ai.google.dev/gemini-api/docs/deep-research) (slower, multi-step research).
 - **ReportLab** — PDF report generation
 - **Pydantic** — Structured agent outputs
 
@@ -41,8 +41,9 @@ Multi-agent pipeline for industry market research: **Taxonomy Architect → Segm
 ## Usage
 
 1. Enter an **Industry / Area** (e.g. "FinTech", "Healthcare IT").
-2. Optionally set **Options** (max categories / segments per category) for a faster demo.
-3. Click **Run Research**. The pipeline runs sequentially; progress is shown.
+2. Choose **Research mode**: Exploratory (industry landscape) or Problem-Driven (validate an idea). Fill problem statement and optional validation fields in Problem-Driven mode.
+3. Optionally in **Options**: set max categories/segments for a faster demo; enable **Use Gemini Deep Research** for Stage 0E to get web-backed, cited insights (takes several minutes).
+4. Click **Run Research**. The pipeline runs sequentially; progress is shown.
 4. When done, use the **Report** tabs to view Executive Summary, Section 1–5, and **Download** for PDF or HTML.
 
 ## Pipeline Overview

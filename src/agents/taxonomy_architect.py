@@ -5,9 +5,21 @@ Output: Section 1 — categories with TAM/SOM, CAGRs (2024–2030), trends.
 """
 from __future__ import annotations
 
+from typing import Any
+
 from src.config import get_model
 from src.gemini_client import generate_json
 from src.models import Category, Section1
+
+
+def _ensure_str_list(x: Any) -> list[str]:
+    if x is None:
+        return []
+    if isinstance(x, list):
+        return [str(i) for i in x]
+    if isinstance(x, str):
+        return [x] if x.strip() else []
+    return []
 
 
 SYSTEM = (
@@ -69,7 +81,7 @@ def run(industry: str, model_name: str | None = None) -> Section1:
                     som=c.get("som") or "",
                     historical_cagr=c.get("historical_cagr") or "",
                     projected_cagr=c.get("projected_cagr") or "",
-                    trends=list(c.get("trends") or []),
+                    trends=_ensure_str_list(c.get("trends")),
                 )
             )
         elif isinstance(c, str):
